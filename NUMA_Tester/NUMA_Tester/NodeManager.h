@@ -30,11 +30,14 @@ public:
     // Run all the tests
     void run_tests(size_t nLoops, bool withSleep) {
 
-        // Run individually the tests for every node against every node
-        // Give BEST and WORST cases for every node
+        // Run Each Memory node against Each Thread node
+        // Give BEST and WORST cases for Every combination
         for (size_t memoryNode = 0; memoryNode < num_nodes; ++memoryNode) {
             for (size_t threadNode = 0; threadNode < num_nodes; ++threadNode) {
+
                 std::cout << "Testing Memory Node: " << memoryNode << " with Thread Node: " << threadNode;
+
+                // Run Every Frame from memoryNode on threadNode - do it nLoops times
                 auto start = std::chrono::high_resolution_clock::now();
                 for (size_t nLoop = 0; nLoop < nLoops; ++nLoop) {
                     for (auto frame : allocators[memoryNode]->getFrames()) {
@@ -43,7 +46,11 @@ public:
                             });
                     }
                 }
+
+                // Wait for all threadNodes to finish
                 thread_pools[threadNode]->wait_for_all();
+
+                // Measure the Duration
                 auto end = std::chrono::high_resolution_clock::now();
                 std::chrono::duration<double> duration = end - start;
                 durations.push_back(duration);
@@ -55,14 +62,17 @@ public:
             }
         }
 
-        // Run ALL the tests for every node against every node
-        // Give General case when ALL Cores running 
+        // Run Every Memory node against every Thread node
+        // Give General case when everything is running 
+        // Total WORST case Performance
         std::cout << "Testing ALL Nodes GENERAL: ";
         {
+            // Run Each Memory node against Each Thread node
             auto start = std::chrono::high_resolution_clock::now();
             for (size_t memoryNode = 0; memoryNode < num_nodes; ++memoryNode) {
                 for (size_t threadNode = 0; threadNode < num_nodes; ++threadNode) {
 
+                    // Run Every Frame from memoryNode on threadNode - do it nLoops times
                     for (size_t nLoop = 0; nLoop < nLoops; ++nLoop) {
                         for (auto frame : allocators[memoryNode]->getFrames()) {
                             thread_pools[threadNode]->enqueue([frame]() {
@@ -77,6 +87,7 @@ public:
             for (size_t threadNode = 0; threadNode < num_nodes; ++threadNode)
                 thread_pools[threadNode]->wait_for_all();
 
+            // Measure the Duration
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> duration = end - start;
             durations.push_back(duration);
@@ -86,14 +97,54 @@ public:
                 std::this_thread::sleep_for(std::chrono::seconds(5));
         }
 
-        // Run ALL the tests for each node against itself
-        // Give BEST case when ALL Cores running
-        std::cout << "Testing ALL Nodes BEST: ";
+        // Run Each Memory node against every Thread node
+        // Give WORST case Per Memory Node 
         {
+            // Run Each Memory node against Each Thread node
+            for (size_t memoryNode = 0; memoryNode < num_nodes; ++memoryNode) {
+
+                std::cout << "Testing Memory Node " << memoryNode << " against ALL Thread Nodes: ";
+
+                auto start = std::chrono::high_resolution_clock::now();
+                for (size_t threadNode = 0; threadNode < num_nodes; ++threadNode) {
+
+                    // Run Every Frame from memoryNode on threadNode - do it nLoops times
+                    for (size_t nLoop = 0; nLoop < nLoops; ++nLoop) {
+                        for (auto frame : allocators[memoryNode]->getFrames()) {
+                            thread_pools[threadNode]->enqueue([frame]() {
+                                process_frame(frame, FRAME_SIZE);
+                                });
+                        }
+                    }
+                }
+
+                // Wait for all threads to finish
+                for (size_t threadNode = 0; threadNode < num_nodes; ++threadNode)
+                    thread_pools[threadNode]->wait_for_all();
+
+                // Measure the Duration
+                auto end = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> duration = end - start;
+                durations.push_back(duration);
+                std::cout << " Duration: " << duration.count() << std::endl;
+
+                if (withSleep)
+                    std::this_thread::sleep_for(std::chrono::seconds(5));
+            }
+        }
+
+        // Run Each Memory node against it own Thread node
+        // Give BEST case when ALL Cores running
+        std::cout << "Testing ALL Node BEST: ";
+        {
+            // Run Each Memory node against the same Thread node
             auto start = std::chrono::high_resolution_clock::now();
             for (size_t memoryNode = 0; memoryNode < num_nodes; ++memoryNode) {
+
                 // Thread and Memory are the same node (BEST case)
                 auto threadNode = memoryNode;
+
+                // Run Every Frame from memoryNode on threadNode - do it nLoops times
                 for (size_t nLoop = 0; nLoop < nLoops; ++nLoop) {
                     for (auto frame : allocators[memoryNode]->getFrames()) {
                         thread_pools[threadNode]->enqueue([frame]() {
@@ -107,6 +158,7 @@ public:
             for (size_t threadNode = 0; threadNode < num_nodes; ++threadNode)
                 thread_pools[threadNode]->wait_for_all();
 
+            // Measure the Duration
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> duration = end - start;
             durations.push_back(duration);
@@ -116,17 +168,20 @@ public:
                 std::this_thread::sleep_for(std::chrono::seconds(5));
         }
 
-        // Run ALL the tests for each node against all the other nodes
+        // Run Each Memory node against ALL the other Thread nodes
         // Give WORST case when ALL Cores running 
         std::cout << "Testing ALL Nodes WORST: ";
         {
+            // Run Each Memory node against Each Thread node
             auto start = std::chrono::high_resolution_clock::now();
             for (size_t memoryNode = 0; memoryNode < num_nodes; ++memoryNode) {
                 for (size_t threadNode = 0; threadNode < num_nodes; ++threadNode) {
+
                     // Ignore Self, already tested above as BEST case
                     if (threadNode == memoryNode)
                         continue;
-
+                    
+                    // Run Every Frame from memoryNode on threadNode - do it nLoops times
                     for (size_t nLoop = 0; nLoop < nLoops; ++nLoop) {
                         for (auto frame : allocators[memoryNode]->getFrames()) {
                             thread_pools[threadNode]->enqueue([frame]() {
@@ -141,6 +196,7 @@ public:
             for (size_t threadNode = 0; threadNode < num_nodes; ++threadNode)
                 thread_pools[threadNode]->wait_for_all();
 
+            // Measure the Duration
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> duration = end - start;
             durations.push_back(duration);
