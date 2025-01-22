@@ -41,7 +41,7 @@ int main() {
                 auto obj = pool.acquire();
 
                 // Randomly allocate buffer size - Test the Object with varying buffer sizes
-                obj->allocateBuffer(bufferDis(gen));
+                auto dataBuffer = obj->allocateBuffer(bufferDis(gen));
 
                 // Random sleep duration - Emulate some processing of the buffer
                 std::this_thread::sleep_for(std::chrono::milliseconds(sleepDis(gen)));

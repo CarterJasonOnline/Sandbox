@@ -6,27 +6,22 @@
 //  ObjectWithData class that has a Reusable buffer
 class ObjectWithData {
 public:
-    ObjectWithData( size_t id ) : id(id), buffer(nullptr), bufferSize(0), activeSize(0) {
+    ObjectWithData( size_t id ) : id(id) {
         std::cout << "ObjectWithData " << id << " created!" << std::endl;
     }
 
     ~ObjectWithData() {
-        std::cout << "ObjectWithData " << id << " destroyed! buffer size: " << bufferSize << " Active Size :" << activeSize << std::endl;
+        std::cout << "ObjectWithData " << id << " destroyed! buffer size: " << buffer.capacity() << " Active Size :" << buffer.size() << std::endl;
     }
 
-    void allocateBuffer(size_t size) {
+    std::byte* allocateBuffer(size_t size) {
 
         // Reallocate buffer if necessary
-        if (bufferSize < size) {
-            buffer.reset(new std::byte[size]);
-            bufferSize = size;
-        }
-        activeSize = size;
+        buffer.resize(size);
+        return buffer.data();
     }
 
 private:
-    std::unique_ptr<std::byte[]> buffer;
-    size_t bufferSize;
-    size_t activeSize;
-    size_t id;
+    std::vector<std::byte> buffer;
+    size_t id = 0;
 };
